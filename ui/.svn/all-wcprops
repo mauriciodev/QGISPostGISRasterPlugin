@@ -1,0 +1,47 @@
+K 25
+svn:wc:ra_dav:version-url
+V 25
+/svn/!svn/ver/16/trunk/ui
+END
+DlgAddRasterLayer.py
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/svn/!svn/ver/11/trunk/ui/DlgAddRasterLayer.py
+END
+DlgRasterLoader.py
+K 25
+svn:wc:ra_dav:version-url
+V 44
+/svn/!svn/ver/16/trunk/ui/DlgRasterLoader.py
+END
+__init__.py
+K 25
+svn:wc:ra_dav:version-url
+V 36
+/svn/!svn/ver/2/trunk/ui/__init__.py
+END
+DlgNewConnection.py
+K 25
+svn:wc:ra_dav:version-url
+V 45
+/svn/!svn/ver/16/trunk/ui/DlgNewConnection.py
+END
+DlgAddRasterLayer.ui
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/svn/!svn/ver/11/trunk/ui/DlgAddRasterLayer.ui
+END
+DlgRasterLoader.ui
+K 25
+svn:wc:ra_dav:version-url
+V 44
+/svn/!svn/ver/16/trunk/ui/DlgRasterLoader.ui
+END
+DlgNewConnection.ui
+K 25
+svn:wc:ra_dav:version-url
+V 45
+/svn/!svn/ver/16/trunk/ui/DlgNewConnection.ui
+END
