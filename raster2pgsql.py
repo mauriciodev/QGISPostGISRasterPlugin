@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 #
-# $Id: raster2pgsql.py 7038 2011-04-15 17:56:46Z jorgearevalo $
+# $Id$
 #
 # This is a simple utility used to dump GDAL dataset into HEX WKB stream.
 # It's considered as a prototype of raster2pgsql tool planned to develop
@@ -76,10 +76,83 @@ def is_nan(x):
     else:
         return math.isnan(x)
 
+def no_command_line(fakeArgs):
+    """Collects, parses and validates command line arguments."""
+
+    prs = OptionParser(version="%prog $Revision$")
+
+    # Mandatory parameters
+    grp0 = OptionGroup(prs, "Source and destination",
+           "*** Mandatory parameters always required ***")
+    grp0.add_option("-r", "--raster", dest="raster", action="append", default=None,
+         help="append raster to list of input files, at least one raster "
+                    "file required. You may use wildcards (?,*) for specifying multiple files.")
+    grp0.add_option("-t", "--table", dest="table", action="store", default=None,
+         help="raster destination in form of [<schema>.]<table> or base raster table for overview level>1, required")
+    prs.add_option_group(grp0);
+
+    # Optional parameters - raster manipulation
+    grp_r = OptionGroup(prs, "Raster processing",
+            "Optional parameters used to manipulate input raster dataset")
+    grp_r.add_option("-s", "--srid", dest="srid", action="store", type="int", default=-1, 
+          help="assign output raster with specified SRID")
+    grp_r.add_option("-b", "--band", dest="band", action="store", type="int", default=None,
+                     help="specify number of the band to be extracted from raster file")
+    grp_r.add_option("-k", "--block-size", dest="block_size", action="store", default=None,
+                     help="cut raster(s) into tiles to be inserted one by table row."
+                     "BLOCK_SIZE is expressed as WIDTHxHEIGHT. Incomplete tiles are completed with nodata values")
+    grp_r.add_option("-R", "--register", dest="register", action="store_true", default=False, 
+                     help="register the raster as a filesystem (out-db) raster")
+    grp_r.add_option("-l", "--overview-level", dest="overview_level", action="store", type="int", default=1,
+                     help='create overview tables named as o_<LEVEL>_<RASTER_TABLE> and '
+                     'populate with GDAL-provided overviews (regular blocking only)')
+    prs.add_option_group(grp_r);
+
+    # Optional parameters - database/table manipulation
+    grp_t = OptionGroup(prs, 'Database processing',
+                        'Optional parameters used to manipulate database objects')
+    grp_t.add_option('-c', '--create', dest='create_table', action='store_true', default=False, 
+                     help='create new table and populate it with raster(s), this is the default mode')
+    grp_t.add_option('-a', '--append', dest='append_table', action='store_true', default=False, 
+                     help='append raster(s) to an existing table')
+    grp_t.add_option("-d", "--drop", dest="drop_table", action="store_true", default=False, 
+                     help="drop table, create new one and populate it with raster(s)")
+    grp_t.add_option("-f", "--field", dest="column", action="store", default=g_rt_column, 
+                     help="specify name of destination raster column, default is 'rast'")
+    grp_t.add_option("-F", "--filename", dest="filename", action="store_true", default=False, 
+                     help="add a column with the name of the file")
+    grp_t.add_option("-I", "--index", dest="index", action="store_true", default=False, 
+                     help="create a GiST index on the raster column")
+    grp_t.add_option("-M", "--vacuum", dest="vacuum", action="store_true", default=False, 
+                     help="issue VACUUM command against all generated tables")
+    grp_t.add_option('-V', '--create-raster-overviews', dest='create_raster_overviews_table',
+                     action='store_true', default=False,
+                     help='create RASTER_OVERVIEWS table used to store overviews metadata')
+    prs.add_option_group(grp_t);
+
+    # Other optional parameters
+    grp_u = OptionGroup(prs, "Miscellaneous", "Other optional parameters")
+    grp_u.add_option("-e", "--endian", dest="endian", action="store", type="int", default=g_rt_endian, 
+                     help="control endianness of generated binary output of raster; "
+                     "specify 0 for XDR and 1 for NDR (default); "
+                     "only NDR output is supported now")
+    grp_u.add_option("-w", "--raster-version", dest="version",
+                     action="store", type="int", default=g_rt_version, 
+                     help="specify version of raster protocol, default is 0; "
+                     "only value of zero is supported now")
+    grp_u.add_option("-o", "--output", dest="output", action="store", default=sys.stdout,
+                     help="specify output file, otherwise send to stdout")
+    grp_u.add_option("-v", "--verbose", dest="verbose", action="store_true", default=False,
+                     help="verbose mode. Useful for debugging")
+    prs.add_option_group(grp_u);
+    
+    (opts, args) = prs.parse_args(fakeArgs)
+    return (opts, args)
+
 def parse_command_line():
     """Collects, parses and validates command line arguments."""
 
-    prs = OptionParser(version="%prog $Revision: 7038 $")
+    prs = OptionParser(version="%prog $Revision$")
 
     # Mandatory parameters
     grp0 = OptionGroup(prs, "Source and destination",
@@ -363,7 +436,7 @@ def make_sql_create_table(options, table = None, is_overview = False):
             sql = "CREATE TABLE %s (rid serial PRIMARY KEY, %s RASTER);\n" \
               % (make_sql_full_table_name(table), quote_sql_name(options.column))
         else:
-            sql = "CREATE TABLE %s (rid serial PRIMARY KEY);\n" \
+            sql = "CREATE TABLE %s (rid serial PRIMARY KEY, rast RASTER);\n" \
               % (make_sql_full_table_name(table))
 
     logit("SQL: %s" % sql)
@@ -857,9 +930,9 @@ def wkblify_raster_level(options, ds, level, band_range, infile, i):
             pixel_types = collect_pixel_types(ds, band_from, band_to)
             nodata_values = collect_nodata_values(ds, band_from, band_to)
             extent = calculate_bounding_box(ds, gt)
-            sql = make_sql_addrastercolumn(options, pixel_types, nodata_values,
-                                           pixel_size, block_size, extent)
-            options.output.write(sql)
+            #sql = make_sql_addrastercolumn(options, pixel_types, nodata_values,
+            #                               pixel_size, block_size, extent)
+            #options.output.write(sql)
         gen_table = options.table
         
     else:
@@ -872,8 +945,8 @@ def wkblify_raster_level(options, ds, level, band_range, infile, i):
         if i == 0:
             sql = make_sql_create_table(options, level_table, True)
             options.output.write(sql)
-            sql = make_sql_register_overview(options, level_table_name, level)
-            options.output.write(sql)
+            #sql = make_sql_register_overview(options, level_table_name, level)
+            #options.output.write(sql)
         gen_table = level_table
 
     # Write (original) raster to hex binary output
@@ -971,11 +1044,12 @@ def main():
     opts.output.write('BEGIN;\n')
 
     # If overviews requested, CREATE TABLE raster_overviews
-    if opts.create_raster_overviews_table:
-        sql = make_sql_create_raster_overviews(opts)
-        opts.output.write(sql)
+    #if opts.create_raster_overviews_table:
+        #sql = make_sql_create_raster_overviews(opts)
+        #opts.output.write(sql)
 
     # Base raster schema
+
     if opts.overview_level == 1:
         # DROP TABLE
         if opts.drop_table:
@@ -1019,7 +1093,7 @@ def main():
     # Cleanup
     if opts.output != sys.stdout:
         sys.stdout = saved_out
-
+        print opts
         print "------------------------------------------------------------"
         print " Summary of GDAL to PostGIS Raster processing:"
         print "------------------------------------------------------------"

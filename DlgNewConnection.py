@@ -13,7 +13,7 @@ class DlgNewConnection(QtGui.QDialog,Ui_DlgNewConnection):
         # Set up the user interface from Designer. 
         self.setupUi(self)
     def addNewConnection(self):
-        settings = QtCore.QSettings()
+        settings = QtCore.QSettings("QuantumGIS","QGIS")
         key = "/PostgreSQL/connections/"+str(self.lineEdit_5.text())
         settings.setValue(key + "/host", QtCore.QVariant(str(self.lineEdit.text())))
         settings.setValue(key + "/port", QtCore.QVariant(int(self.spinBox.value())))

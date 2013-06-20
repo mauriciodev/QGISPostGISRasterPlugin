@@ -18,7 +18,7 @@ class SingletonConn(object):
     
     def listDatabases(self):
         actionsDb = {}
-        settings = QSettings()
+        settings = QSettings("QuantumGIS","QGIS")
         settings.beginGroup("/PostgreSQL/connections")
         keys = settings.childGroups()
     
@@ -32,7 +32,7 @@ class SingletonConn(object):
 
 def listDatabases():
     actionsDb = {}
-    settings = QSettings()
+    settings = QSettings("QuantumGIS","QGIS")
     settings.beginGroup("/PostgreSQL/connections")
     keys = settings.childGroups()
 
@@ -44,7 +44,7 @@ def listDatabases():
 
     
 def getConnString(parent,selected):
-    settings = QSettings()
+    settings = QSettings("QuantumGIS","QGIS")
     # get connection details from QSettings
     settings.beginGroup(u"/PostgreSQL/connections/" + selected)
     if not settings.contains("database"): # non-existent entry?
